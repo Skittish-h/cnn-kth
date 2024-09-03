@@ -72,4 +72,3 @@ if __name__ == "__main__":
 
     y = np.concatenate([np.ones(100), -np.ones(100)])
     perceptron2.train(X, y, lr=0.003, method="delta", epochs=20, visualize=True)
-
