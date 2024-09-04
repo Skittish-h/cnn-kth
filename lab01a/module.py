@@ -31,12 +31,10 @@ class SingleLayerPerceptron:
         plt.scatter(X[:, 0], X[:, 1], c=y, cmap='bwr')
 
         # Plot the decision boundary
-        x1_vals = np.array([-1, 2])
+        x1_vals = np.array([-10, 10])
         x2_vals = -(self.w[0] * x1_vals + self.w[2]) / self.w[1]
 
         plt.plot(x1_vals, x2_vals, 'k--')
-        plt.xlim(-1, 2)
-        plt.ylim(-1, 2)
         plt.show()
 
     def train(self, X, y, lr, method="delta", epochs=10, visualize=False):
