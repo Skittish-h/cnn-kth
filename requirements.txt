@@ -4,3 +4,4 @@ sklearn
 tensorflow-macos
 tensorflow-metal
 pandas
+seaborn
