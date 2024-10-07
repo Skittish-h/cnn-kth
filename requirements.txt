@@ -5,3 +5,4 @@ tensorflow-macos
 tensorflow-metal
 pandas
 seaborn
+minisom
