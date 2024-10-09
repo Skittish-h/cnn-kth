@@ -89,19 +89,6 @@ class DeepBeliefNet():
         return
 
     def generate(self, true_lbl, name):
-
-        """Generate data from labels
-
-        Args:
-          true_lbl: true labels shaped (number of samples, size of label layer)
-          name: string used for saving a video of generated visible activations
-        """
-
-
-
-        # [TODO TASK 4.2] fix the label in the label layer and run alternating Gibbs sampling in the top RBM. From the top RBM, drive the network \
-        # top to the bottom visible layer (replace 'vis' from random to your generated visible layer).
-
         n_sample = true_lbl.shape[0]
         records = []
         fig, ax = plt.subplots(1, 1, figsize=(3, 3))
@@ -109,31 +96,39 @@ class DeepBeliefNet():
         ax.set_xticks([])
         ax.set_yticks([])
 
-        lbl = true_lbl  # Assuming labels are provided correctly
+        lbl = true_lbl  # Fixed labels
 
-        # Initialize penultimate activations based on prior knowledge or a specific strategy
-        pen_initial = np.random.rand(n_sample, self.sizes["pen"])
-
-        combined_input = np.concatenate((pen_initial, lbl), axis=1)
-        h2_h3 = self.rbm_stack["pen+lbl--top"].get_h_given_v(combined_input)[0]
+        # Initialize penultimate activations randomly
+        pen = np.random.rand(n_sample, self.sizes["pen"])
+        v = np.concatenate((pen, lbl), axis=1)
 
         for _ in range(self.n_gibbs_gener):
-            # Sample v (the combined pen+label) from h2_h3
-            v = self.rbm_stack["pen+lbl--top"].get_v_given_h(h2_h3)[0]
+            # Sample hidden units given visible units
+            _, h = self.rbm_stack["pen+lbl--top"].get_h_given_v(v)
 
-            # Clamp the labels: keep the label part fixed while allowing the pen part to be updated
-            v[:, self.sizes["pen"]:] = lbl  # The label part remains fixed
+            # Sample visible units given hidden units
+            _, v = self.rbm_stack["pen+lbl--top"].get_v_given_h(h)
 
-            # Sample h2_h3 from the clamped visible units
-            h2_h3 = self.rbm_stack["pen+lbl--top"].get_h_given_v(v)[0]
+            # Clamp the labels: keep the label part fixed
+            v[:, self.sizes["pen"]:] = lbl
 
-            # Drive the network down to generate the visible layer
-            h1_h2 = self.rbm_stack["hid--pen"].get_h_given_v_dir(v[:, 0:self.sizes["pen"]])[0]
-            vis = self.rbm_stack["vis--hid"].get_v_given_h_dir(h1_h2)[0]
+            # After Gibbs sampling, extract the penultimate layer activations
+            pen = v[:, :self.sizes["pen"]]
+
+            # Drive the network down using sampled activations (not probabilities)
+            _, h1 = self.rbm_stack["hid--pen"].get_v_given_h_dir(pen)
+            _, vis = self.rbm_stack["vis--hid"].get_v_given_h_dir(h1)
+
+            # Use the sampled visible units for visualization
             records.append([ax.imshow(vis.reshape(self.image_size), cmap="bwr", vmin=0, vmax=1, animated=True,
                                       interpolation=None)])
 
-        anim = stitch_video(fig, records).save("%s.generate%d.mp4" % (name, np.argmax(true_lbl)))
+
+
+        # Save the animation
+        anim = stitch_video(fig, records)
+        anim.save("%s.generate%d.mp4" % (name, np.argmax(true_lbl)), fps=30, extra_args=['-vcodec', 'libx264'])
+
         return
 
     def train_greedylayerwise(self, vis_trainset, lbl_trainset, n_iterations):
@@ -167,7 +162,7 @@ class DeepBeliefNet():
             """ 
             CD-1 training for vis--hid 
             """
-            self.rbm_stack["vis--hid"].cd1(vis_trainset, n_iterations)
+            self.rbm_stack["vis--hid"].cd1(vis_trainset, n_iterations//5)
             self.rbm_stack["vis--hid"].untwine_weights()
             # self.savetofile_rbm(loc="trained_rbm", name="vis--hid")
 
@@ -176,7 +171,7 @@ class DeepBeliefNet():
             CD-1 training for hid--pen 
             """
             hidden_activation = self.rbm_stack["vis--hid"].get_h_given_v_dir(vis_trainset)[0]
-            self.rbm_stack["hid--pen"].cd1(hidden_activation, n_iterations)
+            self.rbm_stack["hid--pen"].cd1(hidden_activation, n_iterations//2)
             self.rbm_stack["hid--pen"].untwine_weights()
             # self.savetofile_rbm(loc="trained_rbm", name="hid--pen")
 
